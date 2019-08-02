@@ -4,6 +4,8 @@ A web page where user can see chess opening moves from the online ChessDB.
 ### Web address
 https://fsmosca.github.io/ChessDB-Online-Book/
 
+![](https://i.imgur.com/IWOIbQP.png)
+
 ### Credits
 * ChessDB<br>
 https://github.com/noobpwnftw/chessdb
