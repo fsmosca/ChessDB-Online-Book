@@ -26,38 +26,44 @@
         <div class="col-lg-1"></div>
 
         <!-- Col 2 -->
-        <div class="col-lg-6">
+        <div class="col-lg-4">
           <h5>ChessDB Opening Book</h5>
 
-          <div id="board" style="width: 350px"></div>
+          <div id="board" style="width: 400px"></div>
           <input type="button" id="startBtn" value="Start" />
           <input type="button" id="undoBtn" value="Undo" />
           <input type="button" id="flipBtn" value="Flip" />
           <input type="button" id="inputEpdBtn" value="Setup" />
-          <input type="text" id='fenbox' style="width: 129px" />
+          <input type="text" id='fenbox' style="width: 175px" />
 
           <div id="status" style="font-weight:bold;"></div>
           <div id="fen" style="font-size:10px;"></div>
-          <!-- <p>PGN: <span id="pgn"></span></p> -->
         </div>
 
-        <!-- Col 3 -->
-        <div class="col-lg-4">
-          <h5>PV of top move</h5>
-          <div id="top-move-pv"></div>
-
-          <h5>Book probe results</h5>
-          <table style="width:80%" border="1" cellpadding="1">
-            <tbody id="tbody"></tbody>
-          </table>
+        <!-- PGN col -->
+        <div class="col-lg-3">
+          <h5>PGN</h5>
+          <div style="height:400px; overflow-y:scroll; overflow-wrap:break-word;" id="pgn"></div>
         </div>
 
         <!-- Col 4 -->
+        <div class="col-lg-3">
+          <h5>PV of top move</h5>
+          <div style="height:100px; overflow-y:scroll;" id="top-move-pv"></div>
+
+          <h5>Book probe results</h5>
+          <div style="height:270px; overflow-y:scroll;">
+            <table width=100% border="1" cellpadding="0">
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Col 5 -->
         <div class="col-lg-1"></div>
 
       </div>
     </div>
-    <!-- end example HTML -->
 
     <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
     <script src="js/chessboard-1.0.0.min.js"></script>
@@ -65,13 +71,13 @@
 
     <script>
       var init = function() {
-        document.getElementById('fenbox').value = 'Paste fen here.'
+        document.getElementById('fenbox').value = 'Paste your fen/epd here.'
 
         var board,
           game = new Chess(),
           statusEl = $('#status'),
           fenEl = $('#fen');
-          // pgnEl = $('#pgn');
+          pgnEl = $('#pgn');
 
         // do not pick up pieces if the game is over
         // only pick up pieces for the side to move
@@ -116,7 +122,6 @@
           $.get(url, function(data, status) {
             if (typeof data.moves === 'undefined') {
               console.log('book probing status: ' + data.status);
-              alert('No more book info!');
               $("#tbody tr").remove();
             }
             else {
@@ -160,13 +165,13 @@
 
           // (2) Request query pv
           $.get(pvUrlGet, function(data, status) {
-            if (status == 'success'){
+            if (status == 'success' && data.status == 'ok'){
               var line = "score: " + data.score + ", depth: " + data.depth + "<br>" + data.pvSAN;
               var pv = line.replace(/,/g, ' ');
               document.getElementById('top-move-pv').innerHTML = pv;
             }
             else
-              console.log('No more pv from top move');
+              document.getElementById('top-move-pv').innerHTML = "No more pv info!";
           });
         };
 
@@ -196,7 +201,28 @@
 
           statusEl.html(status);
           fenEl.html(game.fen());
-          // pgnEl.html(game.pgn());
+
+          // Get Date
+          var today = new Date();
+          var dd = today.getDate();
+          var mm = today.getMonth() + 1; //January is 0!
+
+          var yyyy = today.getFullYear();
+          if (dd < 10)
+            dd = '0' + dd;
+          if (mm < 10)
+            mm = '0' + mm;
+          var today = yyyy + '.' + mm + '.' + dd;
+
+          // Add other header tags
+          game.header('Event', 'ChessDB book probing');
+          game.header('Site', 'Online');
+          game.header('Date', today);
+          game.header('Round', '?');
+          game.header('White', '?');
+          game.header('Black', '?');
+          game.header('Result', '*');
+          pgnEl.html(game.pgn({ max_width: 79, newline_char: '<br />' }));
 
           probe_book();
         }; // End of updateStatus
@@ -234,7 +260,7 @@
           var startpos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
           board.position(startpos);
           game.load(startpos);
-          document.getElementById('fenbox').value = 'Paste fen here.'
+          document.getElementById('fenbox').value = 'Paste your fen/epd here.'
           updateStatus();
         });
 
@@ -247,7 +273,6 @@
           board.position(game.fen());
           updateStatus();
         });
-        //--- end example JS ---
 
       }; // end init()
       $(document).ready(init);
