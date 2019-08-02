@@ -54,7 +54,7 @@
           <input type="button" id="undoBtn" value="Undo" />
           <input type="button" id="flipBtn" value="Flip" />
           <input type="button" id="inputEpdBtn" value="Setup" />
-          <input type="text" id='fenbox' style="width: 175px" />
+          <input type="text" placeholder="input your fen or epd" id='fenbox' style="width: 175px" />
 
           <div id="status" style="font-weight:bold;"></div>
           <div id="fen" style="font-size:10px;"></div>
@@ -91,7 +91,7 @@
 
     <script>
       var init = function() {
-        document.getElementById('fenbox').value = 'Paste your fen/epd here.'
+        document.getElementById('fenbox').value = ''
 
         var board,
           game = new Chess(),
@@ -280,7 +280,7 @@
           var startpos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
           board.position(startpos);
           game.load(startpos);
-          document.getElementById('fenbox').value = 'Paste your fen/epd here.'
+          document.getElementById('fenbox').value = ''
           updateStatus();
         });
 
