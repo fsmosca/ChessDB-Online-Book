@@ -65,8 +65,6 @@
 
     <script>
       var init = function() {
-        //--- start example JS ---
-
         document.getElementById('fenbox').value = 'Paste fen here.'
 
         var board,
@@ -111,14 +109,14 @@
 
           // Get the fen from current board position
           var userfen = game.fen();
-          var url = baseUrl + userfen
-          var pvUrlGet = pvUrl + userfen
+          var url = baseUrl + userfen;
+          var pvUrlGet = pvUrl + userfen;
 
           // (1) Request query all
           $.get(url, function(data, status) {
             if (typeof data.moves === 'undefined') {
-              console.log('book probing status: ' + data.status)
-              alert('No more book info!')
+              console.log('book probing status: ' + data.status);
+              alert('No more book info!');
               $("#tbody tr").remove();
             }
             else {
@@ -213,8 +211,8 @@
 
         $('#inputEpdBtn').on('click', function() {
           var pos = document.getElementById('fenbox').value;
-          var epd = pos.split(" ", 4)
-          fen = epd.join(" ") + " 0 1"
+          var epd = pos.split(" ", 4);
+          fen = epd.join(" ") + " 0 1";
           var ok = game.load(fen);
           if (ok) {
             console.log('FEN loading is OK');
@@ -246,7 +244,7 @@
         // Undo last move
         $('#undoBtn').on('click', function() {
           game.undo();
-          board.position(game.fen())
+          board.position(game.fen());
           updateStatus();
         });
         //--- end example JS ---
