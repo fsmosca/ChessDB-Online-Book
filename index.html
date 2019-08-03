@@ -16,6 +16,12 @@
 
     <!-- chessboardjs -->
     <link rel="stylesheet" href="css/chessboard-1.0.0.css" />
+
+    <style type="text/css">
+      .highlight-sq {
+        box-shadow: inset 0 0 3px 3px yellow;
+      }
+    </style>
   </head>
 
   <body>
@@ -54,29 +60,30 @@
           <input type="button" id="undoBtn" value="Undo" />
           <input type="button" id="flipBtn" value="Flip" />
           <input type="button" id="inputEpdBtn" value="Setup" />
-          <input type="text" placeholder="input your fen or epd" id='fenbox' style="width: 175px" />
+          <input type="text" placeholder="input your fen or epd" id='fenbox' style="width: 121px" />
+          <input type="button" id="clearPosBoxBtn" value="Clear" />
 
           <div id="status" style="font-weight:bold;"></div>
           <div id="fen" style="font-size:10px;"></div>
         </div>
 
-        <!-- PGN col -->
-        <div class="col-lg-3">
-          <h5>PGN</h5>
-          <div style="height:400px; overflow-y:scroll; overflow-wrap:break-word;" id="pgn"></div>
-        </div>
-
-        <!-- Col 4 -->
+        <!-- Col 3 -->
         <div class="col-lg-3">
           <h5>PV of top move</h5>
-          <div style="height:100px; overflow-y:scroll;" id="top-move-pv"></div>
+          <div style="height:50px; overflow-y:scroll;" id="top-move-pv"></div>
 
           <h5>Book probe results</h5>
-          <div style="height:270px; overflow-y:scroll;">
+          <div style="height:316px; overflow-y:scroll;">
             <table width=100% border="1" cellpadding="0">
               <tbody id="tbody"></tbody>
             </table>
           </div>
+        </div>
+
+        <!-- Col 4 -->
+        <div class="col-lg-3">
+          <h5>PGN</h5>
+          <div style="height:400px; overflow-y:scroll; overflow-wrap:break-word;" id="pgn"></div>
         </div>
 
         <!-- Col 5 -->
@@ -94,13 +101,26 @@
         document.getElementById('fenbox').value = ''
 
         var board,
-          game = new Chess(),
-          statusEl = $('#status'),
-          fenEl = $('#fen');
-          pgnEl = $('#pgn');
+        game = new Chess(),
+        fenEl = $('#fen');
+        pgnEl = $('#pgn');
+        var $board = $('#board');
+        var squareToHighlight = null;
+        var squareClass = 'square-55d63';
 
-        // do not pick up pieces if the game is over
-        // only pick up pieces for the side to move
+        setPgnGameHeader();
+
+        function removeHighlights() {
+          $board.find('.' + squareClass).removeClass('highlight-sq');
+        }
+
+        function addHighlights(source, target) {
+          $board.find('.square-' + source).addClass('highlight-sq');
+          $board.find('.square-' + target).addClass('highlight-sq');
+        }
+
+        // Disable picking of pieces if the game is over. Also disable picking
+        // of pieces for the side not to move.
         var onDragStart = function(source, piece, position, orientation) {
           if (game.game_over() === true ||
               (game.turn() === 'w' && piece.search(/^b/) !== -1) ||
@@ -120,13 +140,30 @@
           // illegal move
           if (move === null) return 'snapback';
 
+          // Hight the last move made
+          removeHighlights();
+          addHighlights (source, target);
+
           updateStatus();
         };
+
+        function onMoveEnd () {
+          $board.find('.square-' + squareToHighlight).addClass('highlight-sq');
+        }
 
         // update the board position after the piece snap
         // for castling, en passant, pawn promotion
         var onSnapEnd = function() {
           board.position(game.fen());
+        };
+
+        var cfg = {
+          draggable: true,
+          position: 'start',
+          onDragStart: onDragStart,
+          onDrop: onDrop,
+          onMoveEnd: onMoveEnd,
+          onSnapEnd: onSnapEnd
         };
 
         var probe_book = function() {
@@ -140,8 +177,8 @@
 
           // (1) Request query all
           $.get(url, function(data, status) {
-            if (typeof data.moves === 'undefined') {
-              console.log('book probing status: ' + data.status);
+            if (typeof(data.moves) === 'undefined') {
+              console.log('Query all, there is no book move!');
               $("#tbody tr").remove();
             }
             else {
@@ -161,11 +198,11 @@
                 score = json[i].score;
                 winrate = json[i].winrate;
 
-                // 2019-08-02: ChessDB does not return winrate when score is mate.
-                // So we will calculate winrate by logistic function
-                if (typeof winrate === "undefined") {
-                  const K = 1.2;
-                  winrate = 100 * 1/(1 + (10**(-K*score/400)));
+                // 2019-08-03: ChessDB does not return winrate (by design)
+                // when score is a mate. So we will just calculate winrate
+                // by the formula that is used by chessDB.
+                if (typeof(winrate) === "undefined") {
+                  winrate = 100 * 1/(1 + (Math.exp(-score/330)));
                   winrate = winrate.toFixed(2);
                 }
 
@@ -195,34 +232,95 @@
           });
         };
 
+        // Alert user if game is over. Probe online book. Show the fen after
+        // each move. Update game result, fen and pgn boxes.
         var updateStatus = function() {
-          var status = '';
-
           var moveColor = 'White';
           if (game.turn() === 'b')
             moveColor = 'Black';
 
           // checkmate?
-          if (game.in_checkmate() === true)
-            status = 'Game over, ' + moveColor + ' is in checkmate.';
-
+          if (game.in_checkmate() === true) {
+            if (moveColor === 'Black')
+              game.header('Result', '1-0');
+            else
+              game.header('Result', '0-1');
+          }
           // draw?
           else if (game.in_draw() === true)
-            status = 'Game over, drawn position';
+            game.header('Result', '1/2-1/2');
 
-          // game still on
-          else {
-            status = moveColor + ' to move';
+          // Probe the ChessDB online opening book.
+          probe_book();
 
-            // check?
-            if (game.in_check() === true)
-              status += ', ' + moveColor + ' is in check';
-          }
-
-          statusEl.html(status);
+          // Update the fen html PGN boxes
           fenEl.html(game.fen());
+          pgnEl.html(game.pgn({ max_width: 79, newline_char: '<br />' }));
 
-          // Get Date
+        }; // End of updateStatus
+
+        $('#clearPosBoxBtn').on('click', function() {
+          document.getElementById('fenbox').value = '';
+        });
+
+        $('#inputEpdBtn').on('click', function() {
+          var pos = document.getElementById('fenbox').value;
+
+          // Remove empty space at left/right of fen/epd string. Position copied
+          // from Arena 3.5 chess GUI adds empty char at right of fen.
+          pos = pos.trim();
+          document.getElementById('fenbox').value = pos;
+
+          var ok = game.load(pos);
+          if (ok) {
+            setPgnGameHeader();
+            board.position(pos);
+            var s = document.getElementById("tbody");
+            s.innerHTML = '';
+
+            // Hightlight a1 square if turn is black otherwise a8
+            removeHighlights();
+            if (game.turn() === 'b')
+              addHighlights('a1', 'a1');
+            else
+              addHighlights('a8', 'a8');
+
+            updateStatus();
+          }
+          else {
+            console.log('FEN loading is not OK! FEN: ' + pos);
+            alert('The fen/epd that you set up is illegal!')
+          }
+        });
+
+        $('#flipBtn').on('click', function(){
+          board.flip(true);
+        });
+
+        $('#startBtn').on('click', function() {
+          board.start(false);
+          var startpos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+          board.position(startpos);
+          game.load(startpos);
+          document.getElementById('fenbox').value = ''
+          removeHighlights();
+          setPgnGameHeader();
+          updateStatus();
+        });
+
+        board = ChessBoard('board', cfg);
+        updateStatus();
+
+        // Undo last move
+        $('#undoBtn').on('click', function() {
+          game.undo();
+          board.position(game.fen());
+          removeHighlights();
+          updateStatus();
+        });
+
+        function setPgnGameHeader(){
+          // Get Date for Date game header tag.
           var today = new Date();
           var dd = today.getDate();
           var mm = today.getMonth() + 1; //January is 0!
@@ -238,61 +336,10 @@
           game.header('Event', 'ChessDB book probing');
           game.header('Site', 'Online');
           game.header('Date', today);
-          game.header('Round', '?');
+          game.header('Round', '-');
           game.header('White', '?');
           game.header('Black', '?');
-          game.header('Result', '*');
-          pgnEl.html(game.pgn({ max_width: 79, newline_char: '<br />' }));
-
-          probe_book();
-        }; // End of updateStatus
-
-        var cfg = {
-          draggable: true,
-          position: 'start',
-          onDragStart: onDragStart,
-          onDrop: onDrop,
-          onSnapEnd: onSnapEnd
         };
-
-        $('#inputEpdBtn').on('click', function() {
-          var pos = document.getElementById('fenbox').value;
-          var epd = pos.split(" ", 4);
-          fen = epd.join(" ") + " 0 1";
-          var ok = game.load(fen);
-          if (ok) {
-            console.log('FEN loading is OK');
-            board.position(fen);
-            var s = document.getElementById("tbody");
-            s.innerHTML = '';
-            updateStatus();
-          }
-          else
-            console.log('FEN loading is not OK');
-        });
-
-        $('#flipBtn').on('click', function(){
-          board.flip(true);
-        });
-
-        $('#startBtn').on('click', function() {
-          board.start(false);
-          var startpos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-          board.position(startpos);
-          game.load(startpos);
-          document.getElementById('fenbox').value = ''
-          updateStatus();
-        });
-
-        board = ChessBoard('board', cfg);
-        updateStatus();
-
-        // Undo last move
-        $('#undoBtn').on('click', function() {
-          game.undo();
-          board.position(game.fen());
-          updateStatus();
-        });
 
       }; // end init()
       $(document).ready(init);
